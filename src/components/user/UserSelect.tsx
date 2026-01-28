@@ -14,7 +14,7 @@ export function UserSelect({ value, onChange, users }: UserSelectProps) {
       <select
         value={value || ''}
         onChange={(e) => onChange(e.target.value || null)}
-        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
+        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white text-slate-900"
       >
         <option value="">Unassigned</option>
         {users.map((user) => (
