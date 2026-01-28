@@ -1,97 +1,106 @@
-'use client';
+// Task hooks - now using Zustand store with localStorage persistence
+// No server calls needed - all data is persisted locally
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { useBoardStore } from '@/store/boardStore';
-import { CreateTaskRequest, UpdateTaskRequest, Task, TaskStatus } from '@/types';
 import { useEffect } from 'react';
+import { useBoardStore } from '@/store/boardStore';
+import { Task, TaskStatus } from '@/types';
 
-export function useTasks() {
-  const setTasks = useBoardStore((s) => s.setTasks);
+// Initialize the board on mount
+export function useInitializeBoard() {
+  const initialize = useBoardStore((s) => s.initialize);
+  const isInitialized = useBoardStore((s) => s.isInitialized);
   
-  const query = useQuery({
-    queryKey: ['tasks'],
-    queryFn: api.getTasks,
-    staleTime: 1000 * 60,
-  });
-
-  // Sync to store
   useEffect(() => {
-    if (query.data) {
-      setTasks(query.data);
-    }
-  }, [query.data, setTasks]);
-
-  return query;
+    initialize();
+  }, [initialize]);
+  
+  return { isInitialized };
 }
 
+// Get all tasks
+export function useTasks() {
+  const tasks = useBoardStore((s) => s.tasks);
+  const isInitialized = useBoardStore((s) => s.isInitialized);
+  
+  return {
+    data: tasks,
+    isLoading: !isInitialized,
+    error: null
+  };
+}
+
+// Get tasks by status
+export function useTasksByStatus(status: TaskStatus) {
+  const getTasksByStatus = useBoardStore((s) => s.getTasksByStatus);
+  return getTasksByStatus(status);
+}
+
+// Create task mutation
 export function useCreateTask() {
-  const queryClient = useQueryClient();
   const addTask = useBoardStore((s) => s.addTask);
-
-  return useMutation({
-    mutationFn: (data: CreateTaskRequest) => api.createTask(data),
-    onSuccess: (task) => {
-      addTask(task);
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+  
+  return {
+    mutate: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'order'>) => {
+      return addTask(task);
     },
-  });
+    mutateAsync: async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'order'>) => {
+      return addTask(task);
+    },
+    isPending: false
+  };
 }
 
+// Update task mutation
 export function useUpdateTask() {
-  const queryClient = useQueryClient();
   const updateTask = useBoardStore((s) => s.updateTask);
-
-  return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: UpdateTaskRequest }) =>
-      api.updateTask(id, updates),
-    onMutate: ({ id, updates }) => {
-      // Optimistic update
-      updateTask(id, updates as Partial<Task>);
+  
+  return {
+    mutate: ({ id, ...updates }: { id: string } & Partial<Task>) => {
+      updateTask(id, updates);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    mutateAsync: async ({ id, ...updates }: { id: string } & Partial<Task>) => {
+      updateTask(id, updates);
     },
-    onError: () => {
-      // Rollback on error - refetch
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    },
-  });
+    isPending: false
+  };
 }
 
+// Delete task mutation
 export function useDeleteTask() {
-  const queryClient = useQueryClient();
   const deleteTask = useBoardStore((s) => s.deleteTask);
-
-  return useMutation({
-    mutationFn: (id: string) => api.deleteTask(id),
-    onMutate: (id) => {
+  
+  return {
+    mutate: (id: string) => {
       deleteTask(id);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    mutateAsync: async (id: string) => {
+      deleteTask(id);
     },
-    onError: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    },
-  });
+    isPending: false
+  };
 }
 
+// Reorder tasks mutation
 export function useReorderTasks() {
-  const queryClient = useQueryClient();
-  const moveTask = useBoardStore((s) => s.moveTask);
+  const reorderTasks = useBoardStore((s) => s.reorderTasks);
+  
+  return {
+    mutate: (moves: { taskId: string; newStatus: TaskStatus; newOrder: number }[]) => {
+      reorderTasks(moves);
+    },
+    mutateAsync: async (moves: { taskId: string; newStatus: TaskStatus; newOrder: number }[]) => {
+      reorderTasks(moves);
+    },
+    isPending: false
+  };
+}
 
-  return useMutation({
-    mutationFn: (moves: { taskId: string; newStatus: TaskStatus; newOrder: number }[]) =>
-      api.reorderTasks(moves),
-    onMutate: (moves) => {
-      // Optimistic update
-      moves.forEach(({ taskId, newStatus, newOrder }) => {
-        moveTask(taskId, newStatus, newOrder);
-      });
-    },
-    onError: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    },
-  });
+// Get users
+export function useUsers() {
+  const users = useBoardStore((s) => s.users);
+  return {
+    data: users,
+    isLoading: false,
+    error: null
+  };
 }

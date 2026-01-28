@@ -16,11 +16,12 @@ import { KanbanColumn } from './KanbanColumn';
 import { TaskCard } from '../task/TaskCard';
 import { TaskModal } from '../task/TaskModal';
 import { useBoardStore } from '@/store/boardStore';
-import { useTasks, useReorderTasks } from '@/hooks/useTasks';
+import { useTasks, useReorderTasks, useInitializeBoard } from '@/hooks/useTasks';
 import { COLUMNS, Task, TaskStatus } from '@/types';
 import { Plus } from 'lucide-react';
 
 export function KanbanBoard() {
+  useInitializeBoard();
   const { isLoading, error } = useTasks();
   const { mutate: reorderTasks } = useReorderTasks();
   const { tasks, isModalOpen, openCreateModal, getTasksByStatus } = useBoardStore();
