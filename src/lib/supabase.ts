@@ -18,8 +18,28 @@ export interface DbTask {
 
 // Check if Supabase is configured
 export const isSupabaseConfigured = (): boolean => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // In Next.js, NEXT_PUBLIC_ vars should be replaced at build time
+  // But we need to handle cases where process might be undefined
+  let url: string | undefined;
+  let key: string | undefined;
+  
+  try {
+    url = process?.env?.NEXT_PUBLIC_SUPABASE_URL;
+    key = process?.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  } catch {
+    // Fallback for when process is not available
+    console.warn('⚠️ process.env not available, checking for build-time replacements');
+    url = undefined;
+    key = undefined;
+  }
+  
+  console.log('🔍 Supabase Config Check:', { 
+    processAvailable: typeof process !== 'undefined',
+    url: url ? `${url.substring(0, 20)}...` : 'undefined',
+    key: key ? `${key.substring(0, 10)}...` : 'undefined',
+    urlValid: !!(url && url.includes('supabase'))
+  });
+  
   return !!(url && key && url.includes('supabase'));
 };
 
@@ -34,10 +54,23 @@ export const getSupabase = (): SupabaseClient | null => {
   }
   
   if (!supabaseInstance) {
-    supabaseInstance = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    let url: string | undefined;
+    let key: string | undefined;
+    
+    try {
+      url = process?.env?.NEXT_PUBLIC_SUPABASE_URL;
+      key = process?.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    } catch {
+      console.error('❌ Failed to access Supabase environment variables');
+      return null;
+    }
+    
+    if (!url || !key) {
+      console.error('❌ Supabase URL or key not available');
+      return null;
+    }
+    
+    supabaseInstance = createClient(url, key);
   }
   
   return supabaseInstance;
