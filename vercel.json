@@ -1,5 +1,3 @@
 {
-  "outputDirectory": "out",
-  "buildCommand": "npm run build",
-  "framework": null
+  "output": "static"
 }
