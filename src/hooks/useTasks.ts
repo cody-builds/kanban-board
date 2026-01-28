@@ -1,5 +1,5 @@
-// Task hooks - now using Zustand store with localStorage persistence
-// No server calls needed - all data is persisted locally
+// Task hooks - using Zustand store with Supabase or localStorage persistence
+// Automatically uses Supabase if configured, falls back to localStorage
 
 import { useEffect } from 'react';
 import { useBoardStore } from '@/store/boardStore';
@@ -9,12 +9,21 @@ import { Task, TaskStatus } from '@/types';
 export function useInitializeBoard() {
   const initialize = useBoardStore((s) => s.initialize);
   const isInitialized = useBoardStore((s) => s.isInitialized);
+  const useSupabase = useBoardStore((s) => s.useSupabase);
+  const unsubscribe = useBoardStore((s) => s.unsubscribe);
   
   useEffect(() => {
     initialize();
-  }, [initialize]);
+    
+    // Cleanup subscription on unmount
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [initialize, unsubscribe]);
   
-  return { isInitialized };
+  return { isInitialized, useSupabase };
 }
 
 // Get all tasks
@@ -41,10 +50,10 @@ export function useCreateTask() {
   
   return {
     mutate: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'order'>) => {
-      return addTask(task);
+      addTask(task);
     },
     mutateAsync: async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'order'>) => {
-      return addTask(task);
+      return await addTask(task);
     },
     isPending: false
   };
@@ -59,7 +68,7 @@ export function useUpdateTask() {
       updateTask(id, updates);
     },
     mutateAsync: async ({ id, ...updates }: { id: string } & Partial<Task>) => {
-      updateTask(id, updates);
+      await updateTask(id, updates);
     },
     isPending: false
   };
@@ -74,7 +83,7 @@ export function useDeleteTask() {
       deleteTask(id);
     },
     mutateAsync: async (id: string) => {
-      deleteTask(id);
+      await deleteTask(id);
     },
     isPending: false
   };
@@ -89,7 +98,7 @@ export function useReorderTasks() {
       reorderTasks(moves);
     },
     mutateAsync: async (moves: { taskId: string; newStatus: TaskStatus; newOrder: number }[]) => {
-      reorderTasks(moves);
+      await reorderTasks(moves);
     },
     isPending: false
   };
@@ -102,5 +111,18 @@ export function useUsers() {
     data: users,
     isLoading: false,
     error: null
+  };
+}
+
+// Hook to check sync mode
+export function useSyncMode() {
+  const useSupabase = useBoardStore((s) => s.useSupabase);
+  const isInitialized = useBoardStore((s) => s.isInitialized);
+  
+  return {
+    mode: useSupabase ? 'cloud' : 'local',
+    isCloud: useSupabase,
+    isLocal: !useSupabase,
+    isReady: isInitialized
   };
 }
