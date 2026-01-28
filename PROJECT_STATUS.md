@@ -1,6 +1,23 @@
 # Kanban Board - Project Status
 
-## Current State: ✅ Code Complete - Pending Supabase Setup
+## Current State: ✅ Fully Deployed with Real-time Sync
+
+### Latest Fix: Cache-Busting for GitHub Pages (Jan 28)
+
+**Issue**: Different browsers showed different sync statuses (some "Synced", some "Local Only") due to GitHub Pages CDN caching serving stale JavaScript bundles.
+
+**Solution Implemented**:
+- Added `version.json` generation with build timestamp
+- Added `VersionChecker` component that detects stale cache and prompts refresh
+- Added aggressive cache-control meta headers
+- Added Service Worker for cache management
+- Added click-to-refresh on "Local Only" status indicator
+- Post-build script injects cache-busting timestamps
+
+**Immediate Action for Users Seeing "Local Only"**:
+1. Click the "Local Only" indicator to force refresh, OR
+2. Hard refresh the page (Ctrl+Shift+R / Cmd+Shift+R)
+3. Clear browser cache and reload
 
 ### Problem Solved
 **Issue**: Cody creates tasks → Claire cannot see them (localStorage is browser-specific)
