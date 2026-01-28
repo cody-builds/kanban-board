@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kanban Board - Loading...</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .loader {
+      text-align: center;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #334155;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="loader">
+    <div class="spinner"></div>
+    <p>Loading fresh version...</p>
+  </div>
+  
+  <script>
+    // ALTERNATIVE SOLUTION: Loader page that always fetches fresh app
+    // Bookmark THIS URL instead of the main app URL
+    // This page is small enough that caching it doesn't matter
+    
+    (async function() {
+      const basePath = '/kanban-board'; // Adjust for deployment
+      
+      try {
+        // Fetch version with cache busting
+        const resp = await fetch(basePath + '/version.json?t=' + Date.now(), {
+          cache: 'no-store'
+        });
+        const version = await resp.json();
+        
+        // Clear all caches first
+        if ('caches' in window) {
+          const names = await caches.keys();
+          await Promise.all(names.map(name => caches.delete(name)));
+        }
+        
+        // Unregister service workers
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(reg => reg.unregister()));
+        }
+        
+        // Redirect to versioned URL
+        window.location.replace(
+          basePath + '/?_v=' + version.buildTime + '&_t=' + Date.now()
+        );
+        
+      } catch (e) {
+        console.error('Loader error:', e);
+        // Fallback: just redirect with timestamp
+        window.location.replace(basePath + '/?_force=' + Date.now());
+      }
+    })();
+  </script>
+</body>
+</html>

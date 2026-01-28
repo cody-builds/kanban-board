@@ -266,16 +266,40 @@ if (fs.existsSync(jsDir)) {
   }
 }
 
-// 3. Create _headers file for GitHub Pages (may not be honored but doesn't hurt)
-const headersContent = `/*
+// 3. Create _headers file (HONORED by Cloudflare Pages, Netlify - NOT GitHub Pages)
+const headersContent = `# CRITICAL: These headers are ONLY honored by Cloudflare Pages / Netlify
+# GitHub Pages ignores this file completely!
+
+# HTML files - NEVER cache (solves iOS mobile caching issue)
+/
   Cache-Control: no-cache, no-store, must-revalidate
   Pragma: no-cache
   Expires: 0
 
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+
+/*.html
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+
+# Version endpoint - always fresh
 /version.json
   Cache-Control: no-cache, no-store, must-revalidate
 
+# Service worker - always fresh
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# Static assets with content-hash in filename - cache forever
 /_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Fonts - cache long term
+/_next/static/media/*
   Cache-Control: public, max-age=31536000, immutable
 `;
 
