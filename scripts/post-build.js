@@ -1,0 +1,115 @@
+#!/usr/bin/env node
+/**
+ * Post-build script for cache busting
+ * Generates version.json and injects build timestamp into HTML
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+const outDir = path.join(__dirname, '..', 'out');
+const buildTime = Date.now().toString();
+
+console.log('🔧 Running post-build cache-busting...');
+console.log(`   Build version: ${buildTime}`);
+
+// 1. Generate version.json
+const versionData = {
+  buildTime,
+  buildDate: new Date().toISOString(),
+  version: process.env.GITHUB_SHA?.slice(0, 7) || 'local',
+};
+
+const versionPath = path.join(outDir, 'version.json');
+fs.writeFileSync(versionPath, JSON.stringify(versionData, null, 2));
+console.log('✅ Created version.json');
+
+// 2. Update index.html with version and cache headers
+const indexPath = path.join(outDir, 'index.html');
+if (fs.existsSync(indexPath)) {
+  let html = fs.readFileSync(indexPath, 'utf-8');
+  
+  // Remove any existing data-version attributes first (idempotent)
+  html = html.replace(/\s*data-version="[^"]*"/g, '');
+  
+  // Inject version into html tag
+  html = html.replace(
+    /<html([^>]*)>/,
+    `<html$1 data-version="${buildTime}">`
+  );
+  
+  // Add cache-busting meta tags if not present
+  if (!html.includes('http-equiv="Cache-Control"')) {
+    html = html.replace(
+      '</head>',
+      `  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+</head>`
+    );
+  }
+  
+  fs.writeFileSync(indexPath, html);
+  console.log('✅ Updated index.html with version and cache headers');
+}
+
+// 3. Create _headers file for GitHub Pages (may not be honored but doesn't hurt)
+const headersContent = `/*
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+
+/version.json
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+`;
+
+fs.writeFileSync(path.join(outDir, '_headers'), headersContent);
+console.log('✅ Created _headers file');
+
+// 4. Create a simple sw.js for cache management
+const swContent = `// Service Worker for cache management
+const CACHE_VERSION = '${buildTime}';
+
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames
+          .filter((name) => name !== CACHE_VERSION)
+          .map((name) => caches.delete(name))
+      );
+    })
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  // For HTML, always go to network first
+  if (event.request.mode === 'navigate' || 
+      event.request.destination === 'document') {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+  
+  // For other assets, use cache-first
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      return cached || fetch(event.request);
+    })
+  );
+});
+`;
+
+fs.writeFileSync(path.join(outDir, 'sw.js'), swContent);
+console.log('✅ Created sw.js for cache management');
+
+console.log('🎉 Post-build complete!');

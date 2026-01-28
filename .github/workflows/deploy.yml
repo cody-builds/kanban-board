@@ -34,8 +34,25 @@ jobs:
         run: npm run build
         env:
           NEXT_PUBLIC_BASE_PATH: /kanban-board
+          NEXT_PUBLIC_BUILD_VERSION: ${{ github.run_id }}-${{ github.run_number }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GITHUB_SHA: ${{ github.sha }}
+      
+      - name: Verify build output
+        run: |
+          echo "📦 Build output:"
+          ls -la out/
+          echo ""
+          echo "📋 version.json:"
+          cat out/version.json
+          echo ""
+          echo "🔍 Checking Supabase config in bundle..."
+          if grep -q "supabase" out/_next/static/chunks/*.js 2>/dev/null; then
+            echo "✅ Supabase references found in bundle"
+          else
+            echo "⚠️ No Supabase references - check if secrets are configured"
+          fi
       
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
