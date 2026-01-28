@@ -38,13 +38,50 @@ if (fs.existsSync(indexPath)) {
     `<html$1 data-version="${buildTime}">`
   );
   
-  // Add cache-busting meta tags if not present
+  // Add cache-busting meta tags and aggressive mobile refresh script
   if (!html.includes('http-equiv="Cache-Control"')) {
     html = html.replace(
       '</head>',
       `  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
+  <script>
+    // Ultra-aggressive mobile cache busting - runs immediately
+    (function() {
+      const isMobile = /mobile|android|iphone|ipad/i.test(navigator.userAgent);
+      const isIOSChrome = /crios/i.test(navigator.userAgent) || 
+                         (/chrome/i.test(navigator.userAgent) && /ios/i.test(navigator.userAgent));
+      
+      if (!isMobile && !isIOSChrome) return;
+      
+      // Check if we have Supabase config (indicates fresh JS)
+      let hasSupabaseConfig = false;
+      try {
+        hasSupabaseConfig = !!(typeof process !== 'undefined' && 
+                              process.env && 
+                              process.env.NEXT_PUBLIC_SUPABASE_URL);
+      } catch (e) {
+        hasSupabaseConfig = false;
+      }
+      
+      // If no Supabase config on mobile, force hard refresh immediately
+      if (!hasSupabaseConfig) {
+        console.log('Mobile cache detected - forcing immediate refresh');
+        
+        // Clear all possible caches
+        if ('caches' in window) {
+          caches.keys().then(names => names.forEach(name => caches.delete(name)));
+        }
+        
+        // Add cache-busting parameter and hard refresh
+        const currentUrl = new URL(window.location);
+        if (!currentUrl.searchParams.has('_cb')) {
+          currentUrl.searchParams.set('_cb', Date.now().toString());
+          window.location.replace(currentUrl.toString());
+        }
+      }
+    })();
+  </script>
 </head>`
     );
   }
