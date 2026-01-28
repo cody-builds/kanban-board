@@ -18,26 +18,43 @@ export interface DbTask {
 
 // Check if Supabase is configured
 export const isSupabaseConfigured = (): boolean => {
-  // In Next.js, NEXT_PUBLIC_ vars should be replaced at build time
-  // But we need to handle cases where process might be undefined
+  // Multiple methods to access environment variables in static export
   let url: string | undefined;
   let key: string | undefined;
   
+  // Method 1: Direct process.env access (should work with next.config.mjs env)
   try {
-    url = process?.env?.NEXT_PUBLIC_SUPABASE_URL;
-    key = process?.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (typeof process !== 'undefined' && process.env) {
+      url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    }
   } catch {
-    // Fallback for when process is not available
-    console.warn('⚠️ process.env not available, checking for build-time replacements');
-    url = undefined;
-    key = undefined;
+    // Silent fallback
+  }
+  
+  // Method 2: Check if Next.js replaced the variables inline
+  if (!url || !key) {
+    try {
+      // These should be replaced at build time by Next.js
+      const buildTimeUrl = typeof process !== 'undefined' ? process.env?.NEXT_PUBLIC_SUPABASE_URL : undefined;
+      const buildTimeKey = typeof process !== 'undefined' ? process.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY : undefined;
+      
+      if (buildTimeUrl && buildTimeKey) {
+        url = buildTimeUrl;
+        key = buildTimeKey;
+      }
+    } catch {
+      // Silent fallback
+    }
   }
   
   console.log('🔍 Supabase Config Check:', { 
     processAvailable: typeof process !== 'undefined',
+    envAvailable: typeof process !== 'undefined' && !!process.env,
     url: url ? `${url.substring(0, 20)}...` : 'undefined',
     key: key ? `${key.substring(0, 10)}...` : 'undefined',
-    urlValid: !!(url && url.includes('supabase'))
+    urlValid: !!(url && url.includes('supabase')),
+    configMethod: url && key ? 'env-vars' : 'none'
   });
   
   return !!(url && key && url.includes('supabase'));
@@ -57,20 +74,37 @@ export const getSupabase = (): SupabaseClient | null => {
     let url: string | undefined;
     let key: string | undefined;
     
+    // Use same detection logic as isSupabaseConfigured
     try {
-      url = process?.env?.NEXT_PUBLIC_SUPABASE_URL;
-      key = process?.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (typeof process !== 'undefined' && process.env) {
+        url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      }
     } catch {
-      console.error('❌ Failed to access Supabase environment variables');
-      return null;
+      // Silent fallback
     }
     
     if (!url || !key) {
-      console.error('❌ Supabase URL or key not available');
+      try {
+        const buildTimeUrl = typeof process !== 'undefined' ? process.env?.NEXT_PUBLIC_SUPABASE_URL : undefined;
+        const buildTimeKey = typeof process !== 'undefined' ? process.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY : undefined;
+        
+        if (buildTimeUrl && buildTimeKey) {
+          url = buildTimeUrl;
+          key = buildTimeKey;
+        }
+      } catch {
+        // Silent fallback
+      }
+    }
+    
+    if (!url || !key) {
+      console.error('❌ Supabase URL or key not available after all detection methods');
       return null;
     }
     
     supabaseInstance = createClient(url, key);
+    console.log('✅ Supabase client created successfully');
   }
   
   return supabaseInstance;

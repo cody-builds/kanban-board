@@ -209,6 +209,63 @@ if (fs.existsSync(indexPath)) {
   console.log('✅ Updated index.html with version and cache headers');
 }
 
+// 3.5. CRITICAL FIX: Replace environment variables in JavaScript bundles
+// Next.js static export doesn't properly inject NEXT_PUBLIC_ vars, so we do it manually
+const jsDir = path.join(outDir, '_next', 'static', 'chunks');
+if (fs.existsSync(jsDir)) {
+  console.log('🔧 Injecting environment variables into JavaScript bundles...');
+  
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+  
+  if (supabaseUrl && supabaseKey) {
+    // Process all JavaScript files
+    const processJSFiles = (dir) => {
+      const files = fs.readdirSync(dir);
+      files.forEach(file => {
+        const filePath = path.join(dir, file);
+        const stat = fs.statSync(filePath);
+        
+        if (stat.isDirectory()) {
+          processJSFiles(filePath);
+        } else if (file.endsWith('.js')) {
+          let content = fs.readFileSync(filePath, 'utf-8');
+          let modified = false;
+          
+          // Replace the process polyfill env object with actual values
+          const envReplacement = `{NEXT_PUBLIC_SUPABASE_URL:"${supabaseUrl}",NEXT_PUBLIC_SUPABASE_ANON_KEY:"${supabaseKey}",NEXT_PUBLIC_BASE_PATH:"${basePath}",NEXT_PUBLIC_BUILD_VERSION:"${buildTime}"}`;
+          
+          // Find and replace empty env objects
+          if (content.includes('env:{}') || content.includes('env: {}')) {
+            content = content.replace(/env:\s*\{\}/g, `env:${envReplacement}`);
+            modified = true;
+          }
+          
+          // Also replace direct NEXT_PUBLIC_ references
+          if (content.includes('NEXT_PUBLIC_SUPABASE_URL') && !content.includes(supabaseUrl)) {
+            content = content.replace(/process\.env\.NEXT_PUBLIC_SUPABASE_URL/g, `"${supabaseUrl}"`);
+            content = content.replace(/process\.env\.NEXT_PUBLIC_SUPABASE_ANON_KEY/g, `"${supabaseKey}"`);
+            content = content.replace(/p\.env\.NEXT_PUBLIC_SUPABASE_URL/g, `"${supabaseUrl}"`);
+            content = content.replace(/p\.env\.NEXT_PUBLIC_SUPABASE_ANON_KEY/g, `"${supabaseKey}"`);
+            modified = true;
+          }
+          
+          if (modified) {
+            fs.writeFileSync(filePath, content);
+            console.log(`   ✅ Updated ${file}`);
+          }
+        }
+      });
+    };
+    
+    processJSFiles(jsDir);
+    console.log('✅ Environment variables injected into JavaScript bundles');
+  } else {
+    console.log('⚠️ Supabase environment variables not found - skipping injection');
+  }
+}
+
 // 3. Create _headers file for GitHub Pages (may not be honored but doesn't hurt)
 const headersContent = `/*
   Cache-Control: no-cache, no-store, must-revalidate
